@@ -1,0 +1,29 @@
+package com.huliua.classroomcentre.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * @author huliua
+ * @version 1.0
+ * @date 2025-08-22 17:18
+ */
+@TableName("t_classroom_occupy")
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ClassRoomOccupy {
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    @TableId(type = IdType.ASSIGN_ID)
+    private Long id;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long classRoomId;
+}

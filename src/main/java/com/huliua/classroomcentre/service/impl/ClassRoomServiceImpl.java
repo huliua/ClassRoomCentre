@@ -18,10 +18,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.repository.cdi.RedisKeyValueTemplateBean;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
@@ -41,6 +39,8 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     private RedissonClient redissonClient;
     @Resource
     private ClassRoomOccupyMapper classRoomOccupyMapper;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     @Override
     public PageResult<ClassRoomVo> pageQuery(ClassRoomDto classRoomDto) {
@@ -61,7 +61,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     public ResponseResult<Void> occupy(Long classroomId) {
         RLock lock = redissonClient.getLock("classroom:occupy:" + classroomId);
         try {
-            boolean locked = lock.tryLock(5000, 60, TimeUnit.SECONDS);
+            boolean locked = lock.tryLock(5, 60, TimeUnit.SECONDS);
             if (!locked) {
                 return ResponseUtil.fail("服务繁忙，请稍后再试！");
             }
@@ -70,6 +70,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
             if (count == 0) {
                 return ResponseUtil.fail("教室容量已满！");
             }
+            rabbitTemplate.convertAndSend("classroom-centre-exchange", "classroom.occupy", "教室" + classroomId + "新增占用", new CorrelationData(classroomId + ""));
             return ResponseUtil.success();
         } catch (InterruptedException e) {
             log.error("获取锁失败！", e);

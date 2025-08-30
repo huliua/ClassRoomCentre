@@ -5,8 +5,6 @@ import com.huliua.classroomcentre.domain.vo.ClassRoomVo;
 import com.huliua.common.domain.PageResult;
 import com.huliua.common.domain.ResponseResult;
 
-import java.util.List;
-
 /**
  * @author huliua
  * @version 1.0
@@ -16,4 +14,10 @@ public interface ClassRoomService {
     PageResult<ClassRoomVo> pageQuery(ClassRoomDto classRoomDto);
 
     ResponseResult<Void> occupy(Long classroomId);
+
+    void download(ClassRoomDto classRoomDto);
+
+    int importFormExcel();
+
+    int parallelImportFormExcel();
 }

@@ -1,10 +1,10 @@
 package com.huliua.classroomcentre.domain.mapper;
 
 import com.huliua.classroomcentre.domain.dto.ClassRoomDto;
+import com.huliua.classroomcentre.domain.dto.ClassRoomExportDto;
 import com.huliua.classroomcentre.domain.entity.ClassRoom;
 import com.huliua.classroomcentre.domain.vo.ClassRoomVo;
 import org.mapstruct.Mapper;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -23,4 +23,6 @@ public interface ClassRoomBeanMapper {
     ClassRoom toClassRoom(ClassRoomDto classRoomDto);
 
     List<ClassRoom> toClassRooms(List<ClassRoomDto> classRoomDtos);
+
+    List<ClassRoom> toClassRoomFormExport(List<ClassRoomExportDto> classRoomExportDto);
 }

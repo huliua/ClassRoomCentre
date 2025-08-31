@@ -31,6 +31,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -99,33 +101,65 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     public void download(ClassRoomDto classRoomDto) {
         // 计时
         StopWatch sw = new StopWatch();
-        sw.start("单线程导出数据测试");
+        sw.start("导出数据测试");
 
         // 获取总页数
         long count = this.count(classRoomDto.getQueryWrapper());
         long pageSize = 5000;
         // 计算总页数
         long pageCount = count % pageSize == 0 ? count / pageSize : count / pageSize + 1;
-        Page<ClassRoom> page = null;
-        Page<ClassRoom> pageData = null;
 
-        String fileName = "/Users/tigerl/Coder/Java/ClassRoomCentre/" + System.currentTimeMillis() + ".xlsx";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_hhmmss");
+        String fileName = "/Users/tigerl/Coder/Java/ClassRoomCentre/" + LocalDateTime.now().format(formatter) + ".xlsx";
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.min(Runtime.getRuntime().availableProcessors() * 2, 8));
+        List<CompletableFuture<List<ClassRoom>>> futures = new ArrayList<>();
         try (ExcelWriter excelWriter = EasyExcel.write(fileName, ClassRoomExportDto.class).build()) {
             WriteSheet writeSheet = EasyExcel.writerSheet("教室数据").build();
             // 循环写入数据，每次循环只写入pageSize条数据
             for (long i = 0; i < pageCount; i++) {
-                // 构建分区查询对象
-                page = new Page<>(i + 1, (int) pageSize);
-                // 分页去数据库查询数据 这里可以去数据库查询每一页的数据
-                pageData = this.page(page, classRoomDto.getQueryWrapper());
-                excelWriter.write(pageData.getRecords(), writeSheet);
+                long finalI = i;
+                CompletableFuture<List<ClassRoom>> f = CompletableFuture.supplyAsync(() -> {
+                    // 构建分区查询对象
+                    Page<ClassRoom> page = new Page<>(finalI + 1, (int) pageSize);
+                    // 分页去数据库查询数据 这里可以去数据库查询每一页的数据
+                    Page<ClassRoom> paged = this.page(page, classRoomDto.getQueryWrapper());
+                    return paged.getRecords();
+                }, executorService);
+                futures.add(f);
+            }
+
+            // 按顺序获取并写入数据
+            for (int i = 0; i < futures.size(); i++) {
+                try {
+                    List<ClassRoom> classRooms = futures.get(i).get(30, TimeUnit.SECONDS);
+                    if (!classRooms.isEmpty()) {
+                        excelWriter.write(classRooms, writeSheet);
+                    }
+                } catch (Exception e) {
+                    log.error("处理第{}页数据失败", i + 1, e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("导出数据失败！", e);
+        } finally {
+            // 优雅关闭线程池
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                    if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                        log.error("线程池无法正常关闭");
+                    }
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
+
         sw.stop();
-
         // 输出日志
-        log.info("单线程导出数据测试耗时：{}ms", sw.getTotalTimeMillis());
-
+        log.info("导出数据测试耗时：{}ms", sw.getTotalTimeMillis());
     }
 
     /**
@@ -200,10 +234,10 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         try {
             String fileName = "/Users/tigerl/Coder/Java/ClassRoomCentre/data.xlsx";
-            EasyExcel.read(fileName, ClassRoomExportDto.class, new PageReadListener<ClassRoomExportDto>(data -> {
+            EasyExcel.read(fileName, ClassRoom.class, new PageReadListener<ClassRoom>(data -> {
                 CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                     try {
-                        boolean b = saveBatch(classRoomBeanMapper.toClassRoomFormExport(data), 1000);
+                        boolean b = saveBatch(data, 1000);
                         if (b) {
                             successCount.addAndGet(data.size());
                         } else {

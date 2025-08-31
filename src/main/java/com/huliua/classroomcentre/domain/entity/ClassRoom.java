@@ -1,5 +1,6 @@
 package com.huliua.classroomcentre.domain.entity;
 
+import com.alibaba.excel.annotation.ExcelProperty;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -22,12 +23,16 @@ public class ClassRoom {
 
     @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.ASSIGN_ID)
+    @ExcelProperty("教室id")
     private Long id;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    @ExcelProperty("教室代码")
     private Long code;
 
+    @ExcelProperty("教室名称")
     private String name;
 
+    @ExcelProperty("教室容量")
     private Integer capacity;
 }

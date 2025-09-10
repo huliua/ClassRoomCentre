@@ -21,6 +21,10 @@ public class RabbitMqConfig {
 
     @Lazy
     @Resource
+    private Queue myDelayQueue;
+
+    @Lazy
+    @Resource
     private DirectExchange myExchange;
 
     @Lazy
@@ -39,14 +43,27 @@ public class RabbitMqConfig {
     @Bean
     public Queue myQueue() {
         return QueueBuilder.durable("classroom.centre.queue")
-                .withArgument("x-dead-letter-exchange", "dlx.exchange") // 死信交换机
-                .withArgument("x-dead-letter-routing-key", "dlx.order.failed") // 死信路由键
+                .deadLetterExchange("dlx.exchange")
+                .deadLetterRoutingKey("dlx.order.failed")
+                .build();
+    }
+
+    @Bean
+    public Queue myDelayQueue() {
+        return QueueBuilder.durable("delay.queue")
+                .deadLetterExchange("dlx.exchange")
+                .deadLetterRoutingKey("dlx.order.failed")
                 .build();
     }
 
     @Bean
     public Binding bindingMyQueueToExchange() {
         return BindingBuilder.bind(myQueue).to(myExchange).with("classroom.occupy");
+    }
+
+    @Bean
+    public Binding bindingDelayQueueToExchange() {
+        return BindingBuilder.bind(myDelayQueue).to(myExchange).with("delay");
     }
 
     @Bean
@@ -85,7 +102,7 @@ public class RabbitMqConfig {
                 } else {
                     log.info("❌ 消息被拒绝 (NACK) - CorrelationData: {}, 原因: {}", correlationData, cause);
                     // 放入死信队列中
-                    template.send("classroom-centre-dead-exchange", "classroom.centre.dead.queue", new Message("消息被拒绝".getBytes(), new MessageProperties()));
+                    template.send("dlx.exchange", "dlx.order.failed", new Message("消息被拒绝".getBytes(), new MessageProperties()));
                 }
             }
         });

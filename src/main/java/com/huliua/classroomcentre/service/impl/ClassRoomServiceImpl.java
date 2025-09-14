@@ -27,6 +27,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
@@ -52,6 +53,8 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
 
     @Resource
     private ClassRoomBeanMapper classRoomBeanMapper;
+    @Autowired
+    private ClassRoomMapper classRoomMapper;
     @Resource
     private RedissonClient redissonClient;
     @Resource
@@ -62,9 +65,8 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     @Override
     public PageResult<ClassRoomVo> pageQuery(ClassRoomDto classRoomDto) {
         IPage<ClassRoom> page = new Page<>(classRoomDto.getPageNum(), classRoomDto.getPageSize());
-
-        IPage<ClassRoom> pageRes = this.page(page, classRoomDto.getQueryWrapper());
-        return new PageResult<>(pageRes.getTotal(), pageRes.getCurrent(), pageRes.getSize(), pageRes.getPages(), classRoomBeanMapper.toClassRoomVos(pageRes.getRecords()));
+        IPage<ClassRoomVo> pageRes = classRoomMapper.pageQuery(page, classRoomDto.getQueryWrapper());
+        return new PageResult<>(pageRes.getTotal(), pageRes.getCurrent(), pageRes.getSize(), pageRes.getPages(), pageRes.getRecords());
     }
 
     @Override

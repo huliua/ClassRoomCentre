@@ -31,7 +31,7 @@ public class ClassRoomDto extends BasePageQuery {
         QueryWrapper<ClassRoom> queryWrapper = new QueryWrapper<>();
         // 添加具体的查询条件
         if (this.getName() != null && !this.getName().isEmpty()) {
-            queryWrapper.like("name", this.getName());
+            queryWrapper.likeRight("name", this.getName());
         }
         if (this.getCode() != null) {
             queryWrapper.eq("code", this.getCode());

@@ -21,4 +21,8 @@ public class ClassRoomVo {
     private String name;
 
     private Integer capacity;
+
+    private Integer occupyCount;
+
+    private Integer leftCount;
 }

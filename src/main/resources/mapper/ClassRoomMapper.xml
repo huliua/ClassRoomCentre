@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.huliua.classroomcentre.mapper.ClassRoomMapper">
+
+    <select id="pageQuery" resultType="com.huliua.classroomcentre.domain.vo.ClassRoomVo">
+        select * from (
+            select t_classroom.id, t_classroom.code, t_classroom.name, t_classroom.capacity, count(1) as occupy_count, capacity - count(1) as left_count
+            from t_classroom
+            left join t_classroom_occupy on t_classroom.id = t_classroom_occupy.classroom_id
+            group by t_classroom.id, t_classroom.code, t_classroom.name, t_classroom.capacity
+        ) as t
+        <where>
+            ${ew.getSqlSegment()}
+        </where>
+    </select>
+</mapper>

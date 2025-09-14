@@ -77,7 +77,7 @@ redisson:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     default-enum-type-handler: org.apache.ibatis.type.EnumOrdinalTypeHandler
   executor-type: batch
 

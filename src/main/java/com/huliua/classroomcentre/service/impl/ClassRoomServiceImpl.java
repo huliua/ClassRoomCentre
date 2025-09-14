@@ -65,7 +65,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     @Override
     public PageResult<ClassRoomVo> pageQuery(ClassRoomDto classRoomDto) {
         IPage<ClassRoom> page = new Page<>(classRoomDto.getPageNum(), classRoomDto.getPageSize());
-        IPage<ClassRoomVo> pageRes = classRoomMapper.pageQuery(page, classRoomDto.getQueryWrapper());
+        IPage<ClassRoomVo> pageRes = classRoomMapper.pageQuery(page, classRoomDto.buildQueryWrapper());
         return new PageResult<>(pageRes.getTotal(), pageRes.getCurrent(), pageRes.getSize(), pageRes.getPages(), pageRes.getRecords());
     }
 
@@ -106,7 +106,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
         sw.start("导出数据测试");
 
         // 获取总页数
-        long count = this.count(classRoomDto.getQueryWrapper());
+        long count = this.count(classRoomDto.buildQueryWrapper());
         long pageSize = 5000;
         // 计算总页数
         long pageCount = count % pageSize == 0 ? count / pageSize : count / pageSize + 1;
@@ -124,7 +124,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
                     // 构建分区查询对象
                     Page<ClassRoom> page = new Page<>(finalI + 1, (int) pageSize);
                     // 分页去数据库查询数据 这里可以去数据库查询每一页的数据
-                    Page<ClassRoom> paged = this.page(page, classRoomDto.getQueryWrapper());
+                    Page<ClassRoom> paged = this.page(page, classRoomDto.buildQueryWrapper());
                     return paged.getRecords();
                 }, executorService);
                 futures.add(f);

@@ -2,39 +2,32 @@ package com.huliua.classroomcentre.domain.dto;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.huliua.classroomcentre.domain.entity.ClassRoom;
-import com.huliua.common.domain.BasePageQuery;
-import lombok.AllArgsConstructor;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 
-/**
- * @author huliua
- * @version 1.0
- * @date 2025-08-21 17:00
- */
-@EqualsAndHashCode(callSuper = false)
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class ClassRoomDto extends BasePageQuery {
-
-    private Long id;
-
-    private Long code;
-
+@Schema(description = "教室查询参数")
+public class ClassRoomDto {
+    
+    @Schema(description = "页码", example = "1")
+    private Integer pageNum = 1;
+    
+    @Schema(description = "每页数量", example = "10")
+    private Integer pageSize = 10;
+    
+    @Schema(description = "教室编码")
+    private String code;
+    
+    @Schema(description = "教室名称")
     private String name;
-
-    private Integer capacity;
-
-    public QueryWrapper<ClassRoom> getQueryWrapper() {
+    
+    public QueryWrapper<ClassRoom> buildQueryWrapper() {
         QueryWrapper<ClassRoom> queryWrapper = new QueryWrapper<>();
-        // 添加具体的查询条件
-        if (this.getName() != null && !this.getName().isEmpty()) {
-            queryWrapper.likeRight("name", this.getName());
+        if (code != null && !code.isEmpty()) {
+            queryWrapper.eq("code", code);
         }
-        if (this.getCode() != null) {
-            queryWrapper.eq("code", this.getCode());
+        if (name != null && !name.isEmpty()) {
+            queryWrapper.like("name", name);
         }
         return queryWrapper;
     }

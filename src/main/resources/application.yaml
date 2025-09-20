@@ -81,4 +81,12 @@ mybatis-plus:
     default-enum-type-handler: org.apache.ibatis.type.EnumOrdinalTypeHandler
   executor-type: batch
 
+test:
+  encodePassword: ENC(th+cRBjUHfOCrN1iEt+X9w==)
+  plainPassword: 123456
 
+jasypt:
+  encryptor:
+    password: huliua
+    algorithm: PBEWithMD5AndDES
+    iv-generator-classname: org.jasypt.iv.NoIvGenerator # 重点，默认的iv生成器会生成一个随机的iv，每次加密的iv都不一样，导致解密失败

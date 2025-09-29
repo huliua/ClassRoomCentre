@@ -4,10 +4,13 @@
 
     <select id="pageQuery" resultType="com.huliua.classroomcentre.domain.vo.ClassRoomVo">
         select * from (
-            select t_classroom.id, t_classroom.code, t_classroom.name, t_classroom.capacity, count(1) as occupy_count, capacity - count(1) as left_count
+            select t_classroom.*, zyxx.zysl occupy_count, capacity - zyxx.zysl as left_count
             from t_classroom
-            left join t_classroom_occupy on t_classroom.id = t_classroom_occupy.classroom_id
-            group by t_classroom.id, t_classroom.code, t_classroom.name, t_classroom.capacity
+            left join (
+                select classroom_id, count(1) as zysl
+                from t_classroom_occupy
+                group by t_classroom_occupy.classroom_id
+            ) zyxx on t_classroom.id = zyxx.classroom_id
         ) as t
         <where>
             ${ew.getSqlSegment()}

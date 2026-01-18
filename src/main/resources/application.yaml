@@ -51,14 +51,18 @@ spring:
     template:
       mandatory: true
       retry:
-        enabled: true
-        max-attempts: 5
-        multiplier: 2
-        initial-interval: 1000
-        max-interval: 10000
+        enabled: true            # 开启消费者端本地重试
+        max-attempts: 3          # 最大重试次数 (包含第1次)
+        initial-interval: 1000ms # 第一次重试间隔 1秒
+        multiplier: 2            # 间隔倍数 (1s -> 2s -> 4s)
+        max-interval: 10000ms
     listener:
       simple:
-        acknowledge-mode: auto
+        concurrency: 10          # 初始线程数 (常驻消费者)
+        max-concurrency: 50      # 最大线程数 (当队列积压时自动扩容)
+        # 限流配置 (配合上面的并发数)
+        prefetch: 50             # 每个消费者线程只预取 50 条
+        acknowledge-mode: manual # 手动确认
         retry:
           initial-interval: 1000ms
           max-interval: 10000ms
@@ -68,7 +72,7 @@ spring:
 
 
 server:
-  port: 8888
+  port: 18080
 
 redisson:
   singleServerConfig:
@@ -79,14 +83,14 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     default-enum-type-handler: org.apache.ibatis.type.EnumOrdinalTypeHandler
-  executor-type: batch
-
-test:
-  encodePassword: ENC(th+cRBjUHfOCrN1iEt+X9w==)
-  plainPassword: 123456
+#  executor-type: batch
 
 jasypt:
   encryptor:
     password: huliua
     algorithm: PBEWithMD5AndDES
     iv-generator-classname: org.jasypt.iv.NoIvGenerator # 重点，默认的iv生成器会生成一个随机的iv，每次加密的iv都不一样，导致解密失败
+
+test:
+  encodePassword: ENC(th+cRBjUHfOCrN1iEt+X9w==)
+  plainPassword: 123456

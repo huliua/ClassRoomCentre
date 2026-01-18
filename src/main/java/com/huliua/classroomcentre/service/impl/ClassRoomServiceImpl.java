@@ -18,23 +18,23 @@ import com.huliua.classroomcentre.domain.vo.ClassRoomVo;
 import com.huliua.classroomcentre.mapper.ClassRoomMapper;
 import com.huliua.classroomcentre.mapper.ClassRoomOccupyMapper;
 import com.huliua.classroomcentre.service.ClassRoomService;
+import com.huliua.common.domain.BusinessException;
 import com.huliua.common.domain.PageResult;
 import com.huliua.common.domain.ResponseResult;
 import com.huliua.common.utils.ResponseUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
-import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,10 +52,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom> implements ClassRoomService {
 
     private final ClassRoomBeanMapper classRoomBeanMapper;
-    private final ClassRoomMapper classRoomMapper;
-    private final RedissonClient redissonClient;
     private final ClassRoomOccupyMapper classRoomOccupyMapper;
+    private final ClassRoomMapper classRoomMapper;
     private final RabbitTemplate rabbitTemplate;
+    private final StringRedisTemplate redisTemplate;
+    private DefaultRedisScript<Long> occupyScript;
 
     @Override
     public PageResult<ClassRoomVo> pageQuery(ClassRoomDto classRoomDto) {
@@ -66,24 +67,75 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
 
     @Override
     public ResponseResult<Void> occupy(Long classroomId) {
-        RLock lock = redissonClient.getLock("classroom:occupy:" + classroomId);
         try {
-            // 不设置过期时间，则会使用看门狗机制自动续期，默认过期时间为30秒。每隔(30/3=10)秒会去续期一次。续期时间为30秒
-            boolean locked = lock.tryLock();
-            if (!locked) {
-                return ResponseUtil.fail("服务繁忙，请稍后再试！");
+            String key = "classroom:capacity:" + classroomId;
+
+            // 1. 执行脚本
+            long result = redisTemplate.execute(occupyScript, Collections.singletonList(key));
+            // 2. 判断结果
+            if (result == -1) {
+                return ResponseUtil.fail("当前活动未开始！");
             }
-            // 如果容量还有剩余，就占用教室1个容量
-            int count = classRoomOccupyMapper.addIfHasCapacity(classroomId);
-            if (count == 0) {
-                return ResponseUtil.fail("教室容量已满！");
+            if (result == 0) {
+                return ResponseUtil.fail("教室已满！");
             }
-            rabbitTemplate.convertAndSend("classroom-centre-exchange", "classroom.occupy", "教室" + classroomId + "新增占用", new CorrelationData(classroomId + ""));
+            // 3. Redis扣减成功，发送 MQ (此时已获得资格)
+            try {
+                Map<String, Object> message = new HashMap<>();
+                message.put("classroomId", classroomId);
+                message.put("msgId", UUID.randomUUID().toString());
+                rabbitTemplate.convertAndSend("classroom-centre-exchange", "classroom.occupy", message);
+            } catch (Exception mqEx) {
+                // 4. 【关键】MQ 发送失败的补偿机制
+                log.error("MQ send failed, rolling back Redis capacity", mqEx);
+                // 回滚 Redis 库存
+                redisTemplate.opsForValue().increment(key);
+                return ResponseUtil.fail("网络抖动，请重试");
+            }
             return ResponseUtil.success();
-        } finally {
-            if (lock.isHeldByCurrentThread()) {
-                lock.unlock();
+        } catch (Exception e) {
+            log.error("occupy error:", e);
+            return ResponseUtil.fail("服务繁忙，请稍后再试");
+        }
+    }
+
+    @Override
+    public ResponseResult<String> initCache() {
+        try {
+            // 先初始化各个教室的剩余容量信息（只初始化1000条测试数据）
+            ClassRoomDto classRoomDto = new ClassRoomDto();
+            classRoomDto.setPageSize(1000);
+            PageResult<ClassRoomVo> pageResult = this.pageQuery(classRoomDto);
+            List<ClassRoomVo> classRoomVos = pageResult.getRows();
+
+            List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+                classRoomVos.forEach(vo -> {
+                    String key = "classroom:capacity:" + vo.getId();
+                    connection.stringCommands().set(key.getBytes(), String.valueOf(vo.getLeftCount()).getBytes());
+                });
+                return null;
+            });
+
+            // 检查是否有操作失败
+            if (results.contains(null)) {
+                log.warn("部分缓存初始化失败");
+                return ResponseUtil.fail("部分缓存初始化失败！");
             }
+        } catch (Exception e) {
+            log.error("初始化缓存失败！", e);
+            return ResponseUtil.fail("初始化缓存失败！");
+        }
+        return ResponseUtil.success("初始化缓存成功！");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void doOccupy(String classroomId, String userId) {
+        // 添加占用关系
+        int count = classRoomOccupyMapper.addIfHasCapacity(Long.valueOf(classroomId), userId);
+        if (count <= 0) {
+            // 添加失败，则抛出异常，回滚事务
+            throw new BusinessException(-1, "添加失败，教室已满！");
         }
     }
 
@@ -215,7 +267,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
     /**
      * 从Excel导入数据--多线程方式 百万数据大概33秒左右
      * 另外需要考虑多线程下导入数据失败，数据一致性问题。
-     *     例如：可以先将数据导入到临时表，然后通过SQL语句将临时表数据导入到正式表。如果导入到临时表中的数据插入不完整，则需要处理。
+     * 例如：可以先将数据导入到临时表，然后通过SQL语句将临时表数据导入到正式表。如果导入到临时表中的数据插入不完整，则需要处理。
      */
     @Override
     public int parallelImportFormExcel() {
@@ -225,7 +277,7 @@ public class ClassRoomServiceImpl extends ServiceImpl<ClassRoomMapper, ClassRoom
 
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
-        ExecutorService executorService = Executors.newFixedThreadPool( Math.min(Runtime.getRuntime().availableProcessors() * 2, 8));
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.min(Runtime.getRuntime().availableProcessors() * 2, 8));
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         try {
             String fileName = "/Users/tigerl/Coder/Java/ClassRoomCentre/data.xlsx";

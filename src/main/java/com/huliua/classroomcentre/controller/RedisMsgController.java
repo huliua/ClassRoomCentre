@@ -18,4 +18,5 @@ public class RedisMsgController {
         redisTemplate.convertAndSend(RedisConfig.CHANNEL_TOPIC, msg);
         return "success";
     }
+
 }

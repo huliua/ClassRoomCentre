@@ -20,4 +20,8 @@ public interface ClassRoomService {
     int importFormExcel();
 
     int parallelImportFormExcel();
+
+    ResponseResult<String> initCache();
+
+    void doOccupy(String classroomId, String userId);
 }

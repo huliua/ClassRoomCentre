@@ -64,4 +64,10 @@ public class ClassRoomController {
         int count = classRoomService.parallelImportFormExcel();
         return ResponseUtil.success("成功导入"+ count + "条数据！");
     }
+
+    @PostMapping("/initCache.do")
+    @Operation(summary = "初始化缓存", description = "初始化缓存")
+    public ResponseResult<String> initCache() {
+        return classRoomService.initCache();
+    }
 }

@@ -4,7 +4,7 @@
 
     <select id="pageQuery" resultType="com.huliua.classroomcentre.domain.vo.ClassRoomVo">
         select * from (
-            select t_classroom.*, zyxx.zysl occupy_count, capacity - zyxx.zysl as left_count
+        select t_classroom.*, zyxx.zysl occupy_count, capacity - ifnull(zyxx.zysl, 0) as left_count
             from t_classroom
             left join (
                 select classroom_id, count(1) as zysl

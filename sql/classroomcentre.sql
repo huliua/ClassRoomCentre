@@ -1641,18 +1641,11 @@ COMMIT;
 -- Table structure for t_classroom_occupy
 -- ----------------------------
 DROP TABLE IF EXISTS `t_classroom_occupy`;
-CREATE TABLE `t_classroom_occupy` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `classroom_id` bigint NOT NULL COMMENT '教室id',
-  PRIMARY KEY (`id`),
-  KEY `idx_classroom_occupy` (`classroom_id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- ----------------------------
--- Records of t_classroom_occupy
--- ----------------------------
-BEGIN;
-INSERT INTO `t_classroom_occupy` (`id`, `classroom_id`) VALUES (1, 1);
-COMMIT;
-
-SET FOREIGN_KEY_CHECKS = 1;
+create table t_classroom_occupy
+(
+    id           bigint auto_increment       primary key,
+    classroom_id bigint not null comment '教室id',
+    user_id      varchar(40) charset utf8mb3 null comment '用户id',
+    constraint t_classroom_occupy_pk unique (user_id, classroom_id)
+);
+create index idx_classroom_occupy on t_classroom_occupy (classroom_id);
